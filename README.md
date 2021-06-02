@@ -4,29 +4,32 @@
 
 > Similar: https://github.com/developer-guy/google-cloud-function-stdout-falco-alert
 
-A simple demo about how to set up Kubernetes Respons Engine on GKE by using Google Cloud Functions, Falco and Falcosidekick
+This demo demonstrates how to set up Kubernetes Response Engine on GKE by using Google Cloud Functions, Falco and Falcosidekick
 
-### Prerequisites
+## Prerequisites
 
 * gcloud 342.0.0
 
-### Tutorial
+## Tutorial
 
-To test workloadidentity first create a GCP cluster with workloadidentity enabled
+### 1. Create a Cluster
+
+We need to create a GCP cluster with workload identity enabled
 
 ```bash
 $ GOOGLE_PROJECT_ID=$(gcloud config get-value project)
 $ CLUSTER_NAME=falco-falcosidekick-demo
 $ gcloud container clusters create $CLUSTER_NAME \
                    --workload-pool ${GOOGLE_PROJECT_ID}.svc.id.goog
+$ gcloud container clusters get-credentials $CLUSTER_NAME
 ```
 
-Let's deploy the Google Cloud Functions first, because in the later steps, we'll need the name of the function.
+### 2. Deploy Google Cloud Function
 
 ```bash
-$ git clone kubernetes-response-engine-based-on-gke-and-gcloudfunctions
+$ git clone https://github.com/Dentrax/kubernetes-response-engine-based-on-gke-and-gcloudfunctions.git
 $ cd kubernetes-response-engine-based-on-gke-and-gcloudfunctions
-$ export FUNCTION_NAME=KillThePwnedPod
+$ FUNCTION_NAME=KillThePwnedPod
 $ gcloud functions deploy $FUNCTION_NAME --runtime go113 --trigger-http
 Allow unauthenticated invocations of new function [KillThePwnedPod]? (y/N)? N
 ...
@@ -37,7 +40,7 @@ Get the name of the function
 $ CLOUD_FUNCTION_NAME=$(gcloud functions describe --format=json $FUNCTION_NAME | jq -r '.name')
 ```
 
-Once it's created, lets install `Falco`, and `Falcosidekick` with enabled `Google Cloud Functions` output type.
+Then install the `Falco` and `Falcosidekick` enabled with `Google Cloud Functions` output type.
 
 ```bash
 $ export FALCO_NAMESPACE=falco
@@ -77,12 +80,60 @@ $ kubectl annotate serviceaccount \
   iam.gke.io/gcp-service-account=${SA_ACCOUNT}@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 ```
 
+
+### Creating Pod Destroyer Role
+
+1. Create the ClusterRoleBinding
+
+```bash
+$ kubectl create serviceaccount pod-destroyer
+$ kubectl create clusterrole pod-destroyer --verb=delete --resource=pod  # give only pod resource access for delete op 
+$ kubectl create clusterrolebinding pod-destroyer --clusterrole pod-destroyer --serviceaccount default:pod-destroyer
+```
+
+2. Copy the Token from ServiceAccount
+
+```bash
+$ kubectl get secrets $(kubectl get serviceaccounts pod-deleter -o json | jq -r '.secrets[0].name') -o json | jq -r '.data.token' | base64 -D | pbcopy
+```
+
+3. Add `pod-destroyer` user to your _KUBECONFIG_
+
+```yaml
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: XXX
+    server: https://XX.XX.XX.XXX
+  name: gke_falcosidekick-demo
+contexts:
+- context:
+    cluster: gke_falcosidekick-demo
+    namespace: default
+    user: pod-destroyer
+  name: gke_falcosidekick-demo
+current-context: gke_falcosidekick-demo
+users:
+- name: pod-destroyer
+  user:
+    token: $POD_DESTROYER_TOKEN
+```
+
+4. _(OPTIONAL)_ Test with [auth can-i](https://kubernetes.io/docs/reference/access-authn-authz/authorization/#checking-api-access) to check if roles are set correctly
+
+```bash
+$ kubectl auth can-i list deployments  # no
+$ kubectl auth can-i delete pod  # yes
+$ kubectl access-matrix  # github.com/corneliusweig/rakkess
+```
+
 ### Test
 
 Create an alpine pod first, then try to exec into it.
 
 ```bash
-$ kubectl run alpine  --image=alpine --restart='Never' -- sh -c "sleep 600"
+$ kubectl run alpine --image=alpine --restart='Never' -- sh -c "sleep 600"
 ```
 
 Exec into it.
