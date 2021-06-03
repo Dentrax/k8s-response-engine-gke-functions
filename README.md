@@ -53,7 +53,7 @@ $ helm upgrade --install falco falcosecurity/falco \
 --set falcosidekick.webui.enabled=true
 ```
 
-Finally set up the your SA and Rolebindings
+Finally, set up your SA and Rolebindings
 ```bash
 $ SA_ACCOUNT=falco-falcosidekick-sa
 $ gcloud iam service-accounts create $SA_ACCOUNT
@@ -72,7 +72,7 @@ $ gcloud iam service-accounts add-iam-policy-binding \
   ${SA_ACCOUNT}@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 ```
 
-Finally set up the Falcosidekick SA to impersonate a GCP SA
+Finally, set up the Falcosidekick SA to impersonate a GCP SA
 ```bash
 $ kubectl annotate serviceaccount \
   --namespace $FALCO_NAMESPACE \
@@ -130,10 +130,10 @@ $ kubectl access-matrix  # github.com/corneliusweig/rakkess
 
 ### Test
 
-Create an alpine pod first, then try to exec into it.
+Try to run a busybox image and execute a command:
 
 ```bash
-$ kubectl run alpine --image=alpine --restart='Never' -- sh -c "sleep 600"
+$ kubectl run busybox --image=busybox --restart='Never' -- sh -c "sleep 600"
 ```
 
 Exec into it.
