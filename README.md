@@ -45,7 +45,7 @@ Then install the `Falco` and `Falcosidekick` enabled with `Google Cloud Function
 ```bash
 $ export FALCO_NAMESPACE=falco
 $ kubectl create namespace $FALCO_NAMESPACE
-$ helm upgrade --install falco falco \
+$ helm upgrade --install falco falcosecurity/falco \
 --namespace $FALCO_NAMESPACE \
 --set ebpf.enabled=true \
 --set falcosidekick.enabled=true \
