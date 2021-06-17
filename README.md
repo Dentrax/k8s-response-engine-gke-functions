@@ -5,7 +5,6 @@ Here is the high-level overview architecture that shows what we want to achieve:
 ![cloud_functions_reference_arch](.res/cloud_functions_reference_arch.png)
 
 > Similar: https://github.com/developer-guy/google-cloud-function-stdout-falco-alert
-Here is the high-level overview architecture that shows what we want to achieve at the end of the day:
 
 ## Prerequisites
 
