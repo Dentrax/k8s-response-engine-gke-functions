@@ -1,14 +1,17 @@
 package kill_the_pwned_pod
 
 import (
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"context"
 	"encoding/json"
 	"fmt"
+	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
 	"io/ioutil"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -38,14 +41,26 @@ type Operation struct {
 
 // init initializes new Kubernetes ClientSet with given config
 func init() {
-	kubeCfg := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		clientcmd.NewDefaultClientConfigLoadingRules(),
-		&clientcmd.ConfigOverrides{},
-	)
+	// The resource name of the KUBECONFIG_SECRET_NAME in the format
+	// `projects/*/secrets/*/versions/*`
+	resource := os.Getenv("KUBECONFIG_SECRET_NAME")
+	if len(resource) == 0 {
+		panic(fmt.Errorf("$KUBECONFIG_SECRET_NAME env variable did not set"))
+	}
+
+	secret, err := GetSecret(resource)
+	if err != nil {
+		panic(fmt.Errorf("get secret: %q", err))
+	}
+
+	kubeCfg, err := clientcmd.NewClientConfigFromBytes(secret)
+	if err != nil {
+		panic(fmt.Errorf("new client config: %q", err))
+	}
 
 	restCfg, err := kubeCfg.ClientConfig()
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("client config: %q", err))
 	}
 
 	cs, err := kubernetes.NewForConfig(restCfg)
@@ -88,4 +103,25 @@ func (d *Operation) PodDestroy(name, namespace string) error {
 		return fmt.Errorf("unable to delete pod %s: %q", name, err)
 	}
 	return nil
+}
+
+// GetSecret returns the secret data.
+func GetSecret(name string) ([]byte, error) {
+	ctx := context.Background()
+
+	client, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create secretmanager client: %v", err)
+	}
+	defer client.Close()
+
+	result, err := client.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
+		Name: name,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to access secret version: %v", err)
+	}
+
+	return result.Payload.Data, nil
 }
